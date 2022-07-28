@@ -314,18 +314,23 @@ def Run():
         keyslots = get_key_slots()
         tocreate = []
         found = []
-        for key in keygrip_by_id.keys():
+        noprivatekey = []
+        for k, v in keygrip_by_id.items():
             keyexists = False
-            keygrip = keygrip_by_id[key]["okkeygrip"]
+            keygrip = keygrip_by_id[k]["okkeygrip"]
 
             for slot in keyslots:
                 if slot.label == keygrip:
                     keyexists = True
                     print("Key already exists in onlykey")
-            if keyexists is False:
-                tocreate.append(keygrip_by_id[key])
+            if keyexists is False and "keyvalue" in v:
+                tocreate.append(v)
+            elif keyexists is False:
+                noprivatekey.append(v)
             else:
-                found.append(keygrip_by_id[key])
+                found.append(v)
+        print("Keys without a private key:")
+        print(noprivatekey)
         print("Keys already loaded:")
         print(found)
         print("Keys to create:")

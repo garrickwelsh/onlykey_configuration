@@ -23,31 +23,11 @@ Run the following:
 
 To place back into regular mode again unplug then plug back in.
 
-## Configuring ssh
-```ssh-keygen -t ed25519-sk -O resident -f ~/.ssh/id_mykey_sk```
-This will generate an ssh key.
-Run ssh agent. This is what to use in $HOME/.fish/config.fish
-```fish
-if test -z (pgrep ssh-agent)
-  eval (ssh-agent -c)
-  set -Ux SSH_AUTH_SOCK $SSH_AUTH_SOCK
-  set -Ux SSH_AGENT_PID $SSH_AGENT_PID
-  set -Ux SSH_AUTH_SOCK $SSH_AUTH_SOCK
-end
-```
-
-Add the key to the agent to it can be used.
-```ssh-add -K```
-List your public to add it to a website
-```ssh-add -L```
-
-Now log into ssh.
-
-## Configuring GPG
+# Configuring GPG
 
 Get your gpg key. Either get it or generate a new one.
 
-### Generating a key
+## Generating a key
 [Import or Generate a key](https://docs.crp.to/importpgp.html)
 
 ```gpg --expert --full-gen-key```
@@ -61,14 +41,14 @@ Pick the following options:
 Add additional keys.
 ```gpg --output private.asc --armor --export-secret-key <email address>```
 ```gpg --output public.asc --armor --export <email address>```
-### Importing a key into Only Key
+
+## Importing a key into Only Key
 Run onlykey-cli-gpg-add-keys.py [https://github.com/garrickwelsh/onlykey_configuration/blob/master/onlykey-cli-gpg-add-keys.py].
 This has been modified from - [https://raw.githubusercontent.com/trustcrypto/python-onlykey/master/tests/PGPparseprivate.py]
 This will not find slots and add the keys to them (note this is still more of a proof of concept and only supports RSA and ECC Curve25519).
 
-# Import manually
-
-Run the scripts to manually extract your private key and add them to your only key.
+## Import manually
+Run the original scripts to manually extract your private key and add them to your only key.
 __note__: This requires they keygrip patch to libagent.
 
 Set key to configuration mode (hold button 1 for 10 seconds the key will flash red).
@@ -85,24 +65,14 @@ Next create an onlykey agent to run. The updated libagent will search for keys b
 Please see [https://github.com/trustcrypto/OnlyKey-App/issues/166#issuecomment-890157049] for an example.
 ```onlykey-gpg init "FirstName LastName <emailaddress>" -sk 102 -dk 101 -i public.asc```
 
-### Setup systemd
+## Export subkeys only for importation to onlykey (If you use different passwords the private keys separately to support the onlykey-cli-gpg-add-keys.ps script)
+```gpg --output subkeys_private.asc --armor --export-options export-minimal --export-secret-subkeys keyid1! keyid2!```
+```gpg --output public.asc --armor --export <uid>``` - Uid -> "FirstName LastName <emailaddress>"
+```python onlykey-cli-gpg-add-keys.py subkeys.asc```
+__The sk and dk will be ignored at runtime as keys will be found by the keygrips found on the keylabel.
+```onlykey-gpg init "FirstName LastName <emailaddress>" -sk 102 -dk 101 -i public.asc```
+
+# Setup systemd
 [Start agent as systemd](https://docs.crp.to/onlykey-agent.html#how-do-i-start-the-agent-as-a-systemd-unit)
-Follow the instructions above or look at [my configuration](../dotconfig/systemd/user).
-__NOTE__: I had issues signing with running as a systemd service.
-
-### Switch between keys using systemd
-Please refer to [shell scripts](../bin)
-```bash
-#!/bin/bash
-
-systemctl --user stop onlykey-gpg-agent.service
-pushd $HOME/.gnupg
-rm onlykey
-ln -s gmail onlykey
-popd
-systemctl --user start onlykey-gpg-agent.service
-```
-
-## Configuring FIDO2 websites
-Just press the button when required.
+__NOTE__: I had issues signing without running as a systemd service.
 
