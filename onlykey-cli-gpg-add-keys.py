@@ -91,12 +91,21 @@ def set_key_only_key(keyslots, key):
             only_key.setkey(i.targetslot, key_type, key_features, key['keyvalue'])
             only_key.setslot(i.number, MessageField.LABEL, key['okkeygrip'].decode('utf-8'))
             return
-        elif key["algorithmname"] in ("ECDH", "EdDSA"):
+        elif key["algorithmname"] in ("ECDH", "EdDSA", "ECDSA"):
             if i.targetslot <= 100:
                 continue
-            print(f"only_key.setkey({i.targetslot}, 'x', {key_features}, {key['keyvalue']})")
+            if key["curvetype"] in [b'ed25519', b'cv25519']:
+                print(f"only_key.setkey({i.targetslot}, 'x', '{key_features}', '{key['keyvalue']}')")
+                only_key.setkey(i.targetslot, 'x', key_features, key['keyvalue'])
+            elif key["curvetype"] in [b'nistp256']:
+                print(f"only_key.setkey({i.targetslot}, 'n', '{key_features}', '{key['keyvalue']}')")
+                only_key.setkey(i.targetslot, 'n', key_features, key['keyvalue'])
+            elif key["curvetype"] in [b'secp256k1']:
+                print(f"only_key.setkey({i.targetslot}, 's', '{key_features}', '{key['keyvalue']}')")
+                only_key.setkey(i.targetslot, 's', key_features, key['keyvalue'])
+            else:
+                raise "Error unsupported curve"
             print(f"only_key.setslot({i.number}, {MessageField.LABEL}, {key['okkeygrip'].decode('utf-8')})")
-            only_key.setkey(i.targetslot, 'x', key_features, key['keyvalue'])
             only_key.setslot(i.number, MessageField.LABEL, key['okkeygrip'].decode('utf-8'))
             return
         else:
