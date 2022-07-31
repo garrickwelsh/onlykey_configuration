@@ -2,7 +2,7 @@
 """
 Parse the private keys out of OpenPGP keys (ed25519 or RSA) and add them to onlykey with keygrip labels.
 
-It will display the raw subkeys. Only run this on a secure trusted system.
+It will extract and set keys and subkeys in your onlykey. Only run this on a secure trusted system.
 """
 import sys
 import argparse
@@ -20,6 +20,21 @@ algorithmnames = {0x0: "RSA", 0x01: "RSA", 0x02: "RSA", 0x03: "RSA", 0x10: "ElGa
                   0x15: "DiffieHellman", 0x16: "EdDSA"}
 
 only_key = OnlyKey()
+
+
+class KeyDetails:
+    def __init__(self):
+        self.type = ""
+        self.keygrip = ""
+        self.keyid = ""
+        self.curvetype = ""
+        self.keylength = ""
+        self.algorithm = ""
+        self.trust = ""
+        self.keyvalue = None
+
+    def __repr__(self):
+        return f"keyid: {self.keyid}, type: {self.type}, algorithm: {self.algorithm}, keylength {self.keylength}"
 
 def get_keygrips_by_keyid_from_blob(keyblob):
     retval = subprocess.run(['gpg', '--keyid', 'long', '--with-keygrip',
@@ -44,33 +59,33 @@ def get_keygrips_by_keyid_from_blob(keyblob):
 
 
         if values[0] in [b'pub', b'sub', b'sec', b'ssb']:
-            currentKey = { "type" : "", "keygrip" :"", "keyid": "", "curvetype": "", "keylength" : "", "algorithm": ""}
+            currentKey = KeyDetails()
             keys[values[4]] = currentKey
             if values[0] in(b'pub', 'sec'):
-                currentKey["type"] = b's'
+                currentKey.type = b's'
             else:
-                currentKey["type"] = values[11]
-            currentKey["trust"] = values[1]
-            currentKey["curvetype"] = values[16]
-            currentKey["keyid"] = values[4]
-            currentKey["keylength"] = values[2]
-            currentKey["algorithm"] = int(values[3])
-            if currentKey["algorithm"] in algorithmnames:
-                currentKey["algorithmname"] = algorithmnames[currentKey["algorithm"]]
+                currentKey.type = values[11]
+            currentKey.trust = values[1]
+            currentKey.curvetype = values[16]
+            currentKey.keyid = values[4]
+            currentKey.keylength = values[2]
+            currentKey.algorithm = int(values[3])
+            if currentKey.algorithm in algorithmnames:
+                currentKey.algorithmname = algorithmnames[currentKey.algorithm]
             else:
-                currentKey["algorithmname"] = "Unknown"
+                currentKey.algorithmname = "Unknown"
         elif values[0] == b'grp':
-            currentKey["keygrip"] = values[9]
-            currentKey["okkeygrip"] = values[9][:16]
+            currentKey.keygrip = values[9]
+            currentKey.okkeygrip = values[9][:16]
         elif values[0] == b'fpr':
-            currentKey["fingerprint"] = values[9]
+            currentKey.fingerprint = values[9]
     return keys
 
 
 def set_key_only_key(keyslots, key):
-    if key["type"] == b'e':
+    if key.type == b'e':
         key_features = 'd'
-    elif key["type"] in (b's', b'scESC'):
+    elif key.type in (b's', b'scESC'):
         key_features = 's'
     else:
         key_features = key["type"]
@@ -78,38 +93,38 @@ def set_key_only_key(keyslots, key):
     for i in keyslots:
         if i.label != b'':
             continue
-        if key["algorithmname"] == "RSA":
+        if key.algorithmname == "RSA":
             if i.targetslot > 100:
                 continue
             print(f"targetslot - {i.targetslot}, label - {i.label}")
-            if key["keylength"] == b'4096':
+            if key.keylength == b'4096':
                 key_type = '4'
-            elif key["keylength"] == b'2048':
+            elif key.keylength == b'2048':
                 key_type = '2'
-            print(f"only_key.setkey({i.targetslot}, {key_type}, {key_features}, {key['keyvalue']})")
-            print(f"only_key.setslot({i.number}, {MessageField.LABEL}, {key['okkeygrip'].decode('utf-8')})")
-            only_key.setkey(i.targetslot, key_type, key_features, key['keyvalue'])
-            only_key.setslot(i.number, MessageField.LABEL, key['okkeygrip'].decode('utf-8'))
+            print(f"only_key.setkey({i.targetslot}, {key_type}, {key_features}, {key.keyvalue})")
+            print(f"only_key.setslot({i.number}, {MessageField.LABEL}, {key.okkeygrip.decode('utf-8')})")
+            only_key.setkey(i.targetslot, key_type, key_features, key.keyvalue)
+            only_key.setslot(i.number, MessageField.LABEL, key.okkeygrip.decode('utf-8'))
             return
-        elif key["algorithmname"] in ("ECDH", "EdDSA", "ECDSA"):
+        elif key.algorithmname in ("ECDH", "EdDSA", "ECDSA"):
             if i.targetslot <= 100:
                 continue
-            if key["curvetype"] in [b'ed25519', b'cv25519']:
-                print(f"only_key.setkey({i.targetslot}, 'x', '{key_features}', '{key['keyvalue']}')")
-                only_key.setkey(i.targetslot, 'x', key_features, key['keyvalue'])
-            elif key["curvetype"] in [b'nistp256']:
-                print(f"only_key.setkey({i.targetslot}, 'n', '{key_features}', '{key['keyvalue']}')")
-                only_key.setkey(i.targetslot, 'n', key_features, key['keyvalue'])
-            elif key["curvetype"] in [b'secp256k1']:
-                print(f"only_key.setkey({i.targetslot}, 's', '{key_features}', '{key['keyvalue']}')")
-                only_key.setkey(i.targetslot, 's', key_features, key['keyvalue'])
+            if key.curvetype in [b'ed25519', b'cv25519']:
+                print(f"only_key.setkey({i.targetslot}, 'x', '{key_features}', '{key.keyvalue}')")
+                only_key.setkey(i.targetslot, 'x', key_features, key.keyvalue)
+            elif key.curvetype in [b'nistp256']:
+                print(f"only_key.setkey({i.targetslot}, 'n', '{key_features}', '{key.keyvalue}')")
+                only_key.setkey(i.targetslot, 'n', key_features, key.keyvalue)
+            elif key.curvetype in [b'secp256k1']:
+                print(f"only_key.setkey({i.targetslot}, 's', '{key_features}', '{key.keyvalue}')")
+                only_key.setkey(i.targetslot, 's', key_features, key.keyvalue)
             else:
                 raise "Error unsupported curve"
-            print(f"only_key.setslot({i.number}, {MessageField.LABEL}, {key['okkeygrip'].decode('utf-8')})")
-            only_key.setslot(i.number, MessageField.LABEL, key['okkeygrip'].decode('utf-8'))
+            print(f"only_key.setslot({i.number}, {MessageField.LABEL}, {key.okkeygrip.decode('utf-8')})")
+            only_key.setslot(i.number, MessageField.LABEL, key.okkeygrip.decode('utf-8'))
             return
         else:
-            print("algorithm - %s is unsupported" % (key["algorithmname"]))
+            print("algorithm - %s is unsupported" % (key.algorithmname))
 
 
 def get_key_type(key:pgpy.PGPKey):
@@ -236,9 +251,8 @@ def Run():
 
     parser = argparse.ArgumentParser(
         description='Extract secret subkeys from a OpenPGP key.\n\n'
-                    'This script will display the raw subkeys. '
-                    'Only run this on a secure trusted\n'
-                    'system.',
+                    'This script will display and set the raw private keys and subkeys on your only key.\n'
+                    'Only run this on a secure trusted system.',
         epilog='''Example:
         gpg --export-secret-keys -a keyid | ./PGPparseprivate.py -
         ./PGPparseprivate.py ~/mykey.asc --no-expired
@@ -279,8 +293,11 @@ def Run():
     primary_key, _ = pgpy.PGPKey.from_blob(armored_key)
     keygrip_by_id = get_keygrips_by_keyid_from_blob(armored_key)
 
-    assert primary_key.is_protected
-    assert primary_key.is_unlocked is False
+    # If the private primary key isn't included but the subkeys are
+    # then the primary key isn't protected and isn't locked. Need to
+    # rewrite assertion to take this into account.
+    # assert primary_key.is_protected
+    # assert primary_key.is_unlocked is False
 
     try:
         password = args.passphrase if args.passphrase else getpass.getpass(
@@ -300,7 +317,7 @@ def Run():
                 print(f'primary key usage: {get_key_flags(primary_key)}')
                 print(f'{GREEN}primary key value:{END} {key_value}')
                 print(f'primary key size: {key_size} bits')
-                keygrip_by_id[primary_key.fingerprint.keyid.encode('ascii')]["keyvalue"] = key_value
+                keygrip_by_id[primary_key.fingerprint.keyid.encode('ascii')].keyvalue = key_value
 
         print("Extracting subkeys...")
 
@@ -318,7 +335,7 @@ def Run():
                 print(f'{GREEN}subkey value:{END} {key_value}')
                 print(f'subkey size: {key_size} bits')
                 print()
-                keygrip_by_id[key_id.encode('ascii')]["keyvalue"] = key_value
+                keygrip_by_id[key_id.encode('ascii')].keyvalue = key_value
 
         keyslots = get_key_slots()
         tocreate = []
@@ -326,13 +343,13 @@ def Run():
         noprivatekey = []
         for k, v in keygrip_by_id.items():
             keyexists = False
-            keygrip = keygrip_by_id[k]["okkeygrip"]
+            keygrip = keygrip_by_id[k].okkeygrip
 
             for slot in keyslots:
                 if slot.label == keygrip:
                     keyexists = True
                     print("Key already exists in onlykey")
-            if keyexists is False and "keyvalue" in v:
+            if keyexists is False and v.keyvalue is not None:
                 tocreate.append(v)
             elif keyexists is False:
                 noprivatekey.append(v)
@@ -346,7 +363,7 @@ def Run():
         print(tocreate)
         for i in tocreate:
             set_key_only_key(keyslots, i)
-            time.sleep(1.1)
+            time.sleep(2.0)
             keyslots = get_key_slots()
         print("Keyslots:")
         print(keyslots)
